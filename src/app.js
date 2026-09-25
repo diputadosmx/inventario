@@ -431,7 +431,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         else if(activeTab==='reportes')renderReportSearch();
     });
 
-    function renderDashboard() { document.getElementById('total-items').textContent = state.inventory.length; document.getElementById('located-items').textContent = state.inventory.filter(i=>i.UBICADO==='SI').length; document.getElementById('pending-items').textContent = state.inventory.filter(i=>i.UBICADO!=='SI').length; updateHeaderArea(); }
+    function renderAreaProgress() {
+        const list=document.getElementById('area-progress-list'),summary=document.getElementById('area-progress-summary');
+        list.replaceChildren();
+        const rows=InventoryProgress.areas(state),total=rows.reduce((n,r)=>n+r.total,0),located=rows.reduce((n,r)=>n+r.located,0);
+        summary.textContent=(total?Math.round(located*100/total):0)+'% general';
+        if(!rows.length){const empty=document.createElement('p');empty.className='area-progress-empty';empty.textContent='Carga un listado Excel para ver el avance por área.';list.append(empty);return;}
+        for(const row of rows){
+            const card=document.createElement('article'),heading=document.createElement('h3'),name=document.createElement('p'),count=document.createElement('p'),meter=document.createElement('progress'),percent=document.createElement('strong'),pending=document.createElement('small'),track=document.createElement('div');
+            card.className='area-progress-card';heading.textContent='Área '+row.id;name.className='area-progress-name';name.textContent=row.name||'Sin nombre de área';
+            count.textContent=row.located+' de '+row.total+' ubicados';track.className='area-progress-track';meter.max=row.total||1;meter.value=row.located;meter.setAttribute('aria-label','Avance del área '+row.id);percent.textContent=row.percent+'%';pending.textContent=row.pending+' pendientes';
+            track.append(meter,percent);card.append(heading,name,count,track,pending);list.append(card);
+        }
+    }
+    function renderDashboard() { document.getElementById('total-items').textContent = state.inventory.length; document.getElementById('located-items').textContent = state.inventory.filter(i=>i.UBICADO==='SI').length; document.getElementById('pending-items').textContent = state.inventory.filter(i=>i.UBICADO!=='SI').length; renderAreaProgress(); updateHeaderArea(); }
 
     function populateFilters() {
         const areas = [...new Set([...state.inventory.map(i=>i.areaOriginal), ...state.resguardantes.map(u=>u.area)])].sort();

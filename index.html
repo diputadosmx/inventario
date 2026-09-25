@@ -343,7 +343,13 @@
                     </div>
                 </div>
 
-                <div id="settings-tab" class="tab-content"><section class="area-review" id="camera-settings"><h2>Cámara predeterminada</h2><p>Elige la cámara para fotografías y escaneo de QR o códigos de barras. Puedes cambiarla cuando quieras.</p><div class="review-controls"><label for="camera-default">Cámara del dispositivo<select id="camera-default"><option value="">Automática (preferir trasera)</option></select></label><button type="button" data-action="photo" id="camera-refresh">Detectar cámaras</button></div><p id="camera-setting-status" role="status"></p></section><section id="rfid-panel" aria-label="Catálogo RFID">
+                <div id="settings-tab" class="tab-content">
+                    <details id="area-progress-panel" class="area-review" aria-labelledby="area-progress-title">
+                        <summary id="area-progress-title">Avance por área</summary>
+                        <div class="area-progress-heading"><p>Porcentaje de bienes del inventario que ya fueron ubicados.</p><strong id="area-progress-summary" aria-live="polite"></strong></div>
+                        <div id="area-progress-list" class="area-progress-list"></div>
+                    </details>
+                    <section class="area-review" id="camera-settings"><h2>Cámara predeterminada</h2><p>Elige la cámara para fotografías y escaneo de QR o códigos de barras. Puedes cambiarla cuando quieras.</p><div class="review-controls"><label for="camera-default">Cámara del dispositivo<select id="camera-default"><option value="">Automática (preferir trasera)</option></select></label><button type="button" data-action="photo" id="camera-refresh">Detectar cámaras</button></div><p id="camera-setting-status" role="status"></p></section><section id="rfid-panel" aria-label="Catálogo RFID">
 <h2>Catálogo RFID</h2><p>Equivalencias entre tags y claves únicas, disponibles sin internet en este equipo. Las claves .391880 y 0.39188 se reconocen como la misma. Importar no modifica el inventario.</p>
 <p id="rfid-summary">Abre Ajustes para consultar el catálogo.</p>
 <label for="rfid-files">Importar Excel de tags o respaldo del catálogo (JSON)</label><input id="rfid-files" type="file" accept=".xlsx,.xls,.json" multiple>
@@ -398,6 +404,7 @@
 <script src="src/search.js"></script>
 <script src="src/retag.js"></script>
 <script src="src/asset-status.js"></script>
+<script src="src/progress.js"></script>
 <script src="src/app.js"></script>
 <script src="src/rfid-ui.js"></script>
 </body>
