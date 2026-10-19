@@ -1,6 +1,7 @@
 (function(root){
   'use strict';
-  const normalize=value=>typeof value==='string'?value.normalize('NFC').trim().replace(/\s+/g,' ').toLocaleLowerCase('es'):'';
+  const display=value=>root.InventoryNotes?.description(value)??value;
+  const normalize=value=>typeof value==='string'?display(value).normalize('NFC').trim().replace(/\s+/g,' ').toLocaleLowerCase('es'):'';
   const official=()=>typeof module!=='undefined'?require('./official-descriptions.js'):root.InventoryOfficialDescriptions;
   function dismissed(state){
     return [...new Set((Array.isArray(state?.dismissedNoteSuggestions)?state.dismissedNoteSuggestions:[]).map(normalize).filter(Boolean))];
@@ -22,11 +23,11 @@
   }
   function list(state,query='',context){
     const excluded=new Set(dismissed(state)),seen=new Set(),search=normalize(query),result=[];
-    const items=context?new Map([...(state.additionalItems||[]).map(i=>[String(i.claveAsignada),i]),...(state.inventory||[]).map(i=>[String(i['CLAVE UNICA']),i])]):null;
+    const items=context?new Map([...(state.additionalItems||[]).map(i=>[String(i.claveAsignada||'ADICIONAL:'+i.id),i]),...(state.inventory||[]).map(i=>[String(i['CLAVE UNICA']),i])]):null;
     for(const [itemKey,note] of [...Object.entries(state.notes||{}),...Object.entries(state.archivedNotes||{})]){
       const key=normalize(note);
       if(!noteRelated(items,itemKey,note,context)||!key||seen.has(key)||excluded.has(key)||key===search||(search&&!key.includes(search)))continue;
-      seen.add(key);result.push(note);
+      seen.add(key);result.push(display(note));
       if(result.length===5)break;
     }
     return result;
