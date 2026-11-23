@@ -68,7 +68,7 @@
     setItem(store,key,value,related=[]) {
       const task = api.transaction([...new Set([store,...related.map(item=>item.store)])],'readwrite',tx=>{
         tx.objectStore(store).put(value,key);
-        for(const item of related)tx.objectStore(item.store).put(item.value,item.key);
+        for(const item of related){if(item.delete)tx.objectStore(item.store).delete(item.key);else tx.objectStore(item.store).put(item.value,item.key);}
       });
       pending.add(task);
       window.dispatchEvent(new CustomEvent('inventory-save', {detail:'Guardando en este equipo…'}));

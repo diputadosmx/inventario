@@ -1,7 +1,7 @@
 window.addEventListener('DOMContentLoaded', () => {
   const label = document.getElementById('device-status');
   let saving = 'Almacenamiento local';
-  const render = () => { label.textContent = 'v1.4.37 · ' + (navigator.onLine ? 'Con conexión' : 'Sin conexión') + ' · ' + saving; };
+  const render = () => { label.textContent = 'v1.4.38 · ' + (navigator.onLine ? 'Con conexión' : 'Sin conexión') + ' · ' + saving; };
   window.addEventListener('online', render);
   window.addEventListener('offline', render);
   window.addEventListener('inventory-save', e => { saving=e.detail; render(); });
@@ -15,6 +15,7 @@ window.addEventListener('DOMContentLoaded', () => {
       button.style.cssText='display:block;margin:8px auto;padding:10px 16px;background:#03564B;color:white;border-radius:10px;font-weight:bold';
       label.after(button);
       button.onclick=async()=>{
+        if(window.InventoryWorkspaceBusy){button.textContent='Espera a que termine el cambio de sesión';return;}
         const form=document.getElementById('adicional-form');
         const editing=document.getElementById('edit-adicional-modal')?.classList.contains('show');
         if(document.getElementById('location-edit-modal')?.classList.contains('show')||document.getElementById('edit-user-modal')?.classList.contains('show')||window.InventoryRFIDBusy||!document.getElementById('rfid-preview')?.hidden||document.getElementById('notes-modal')?.classList.contains('show')||document.querySelector('dialog.import-review[open]')||editing||[...(form?.querySelectorAll('input[type="text"]')||[])].some(input=>input.value.trim())){

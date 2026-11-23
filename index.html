@@ -132,6 +132,8 @@
     <details id="import-details" hidden style="margin:12px;padding:12px;background:white;border:1px solid #CEDFD7;border-radius:12px"><summary>Revisar diferencias y advertencias de la carga</summary><pre id="import-details-text" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px"></pre></details>
     <div id="app-container" inert class="min-h-screen p-2 md:p-4 bg-gray-100">
 
+        <section id="workspace-bar" class="workspace-bar" hidden><label for="workspace-select">Sesión de inventario</label><select id="workspace-select"></select><button type="button" id="workspace-manage" data-action="info">Sesiones · Nueva</button></section>
+        <dialog id="workspace-dialog" class="workspace-dialog"><header><h2>Sesiones de inventario</h2><button type="button" data-action="neutral" id="workspace-close">Cerrar</button></header><p>Sesión actual: <strong id="workspace-current"></strong></p><p>Cada sesión conserva sus listados, fotos, notas y avance por separado. Para respaldar una sesión, ábrela y genera su ZIP.</p><p id="workspace-status" role="status"></p><form id="workspace-create-form"><label>Nombre de la nueva sesión<input id="workspace-new-name" maxlength="80" required placeholder="Ej. CENDI — turno 2"></label><label><input type="checkbox" id="workspace-same-team" checked> Usar el mismo equipo de auditores</label><button type="submit" data-action="save">Crear sesión vacía</button></form><p>Para archivar o eliminar la sesión actual, cambia primero a otra sesión.</p><div id="workspace-list"></div></dialog>
         <section id="team-page" class="team-card">
             <button data-action="neutral" id="team-back" type="button" hidden>← Regresar al inventario</button>
             <img src="logo.png" alt="Inventario" class="team-logo">
@@ -365,7 +367,7 @@
                     </div>
                 </div>
 
-                <div id="settings-tab" class="tab-content"><details id="area-progress-panel" class="area-review" aria-labelledby="area-progress-title">
+                <div id="settings-tab" class="tab-content"><section class="area-review"><h3>Sesiones de inventario</h3><p>Usa el selector de sesión de la parte superior para continuar otra área. En «Sesiones · Nueva» puedes crear, renombrar, archivar o eliminar sesiones.</p><button id="workspace-settings-manage" type="button" data-action="info">Administrar sesiones</button></section><details id="area-progress-panel" class="area-review" aria-labelledby="area-progress-title">
                         <summary id="area-progress-title">Avance por área</summary>
                         <div class="area-progress-heading"><p>Porcentaje de bienes del inventario que ya fueron ubicados.</p><strong id="area-progress-summary" aria-live="polite"></strong></div>
                         <div id="area-progress-list" class="area-progress-list"></div>
@@ -418,6 +420,7 @@
 
     <div id="toast-container" class="fixed left-1/2 transform -translate-x-1/2 space-y-2 flex flex-col items-center pointer-events-none" role="status" aria-live="polite" aria-atomic="false"></div>
 <script src="src/data.js"></script>
+<script src="src/workspaces.js"></script>
 <script src="src/storage.js"></script>
 <script src="src/rfid-core.js"></script>
 <script src="src/rfid-store.js"></script>

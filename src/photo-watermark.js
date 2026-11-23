@@ -48,7 +48,7 @@
 
   // Always derive from the stored original: a changed additional-item key must
   // replace the visible label without stacking watermarks or recompressing it.
-  async function stamp(blob, key, description = '') {
+  async function createStamped(blob, key, description = '') {
     const label = String(key ?? '').trim().replace(/\s+/g, ' ');
     if (!label) return blob;
     if (!blob || typeof blob.arrayBuffer !== 'function') throw new Error('La fotografía no es válida.');
@@ -92,6 +92,15 @@
       decoded.release();
       if (canvas) { canvas.width = 0; canvas.height = 0; }
     }
+  }
+
+  const prepared=new WeakMap();
+  async function stamp(blob,key,description=''){
+    if(!String(key??'').trim()||!blob||typeof blob.arrayBuffer!=='function')return createStamped(blob,key,description);
+    let variants=prepared.get(blob);if(!variants){variants=new Map();prepared.set(blob,variants);}
+    const label=JSON.stringify([String(key).trim(),String(description)]);
+    if(!variants.has(label)){const task=createStamped(blob,key,description);variants.set(label,task);if(variants.size>4)variants.delete(variants.keys().next().value);task.catch(()=>{if(variants.get(label)===task)variants.delete(label);});}
+    return variants.get(label);
   }
 
   async function render(element, blob, key, description) {

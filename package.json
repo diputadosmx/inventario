@@ -1,6 +1,6 @@
 {
   "name": "control-de-inventarios",
-  "version": "1.4.37",
+  "version": "1.4.38",
   "private": true,
   "scripts": {
     "start": "node tools/serve.cjs",

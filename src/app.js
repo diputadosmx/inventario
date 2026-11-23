@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         await InventoryStorage.acquireWorkspace();
         clearTimeout(waiting);
-        await InventoryStorage.init('parejas-local-v1');
+        InventorySessions.boot();await InventoryStorage.init(InventorySessions.account());await InventorySessions.prepare(InventoryStorage);
         gate.hidden = true; document.getElementById('app-container').inert = false;
     } catch(error) {
         clearTimeout(waiting); document.getElementById('workspace-message').textContent = error.message; return;
@@ -81,10 +81,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     function photoDescription(type,id){const item=type==='inventory'?state.inventory.find(i=>i['CLAVE UNICA']===id):type==='additional'?state.additionalItems.find(i=>i.id===id):null;return item?.DESCRIPCION||item?.DESCRripcion||item?.descripcion||'';}
     function photoKey(type,id){return type==='inventory'?String(id):(type==='additional'?state.additionalItems.find(item=>item.id===id)?.claveAsignada||'':'');}
     function clearPhotoView(element){photoViewRequests.set(element,{});InventoryPhotoWatermark.clear(element);}
-    async function loadPhotoView(elementId,type,id,onReady){
+    async function loadPhotoView(elementId,type,id,onReady,providedBlob){
         const element=document.getElementById(elementId),request={};clearPhotoView(element);photoViewRequests.set(element,request);
         try{
-            const blob=await photoDB.getItem('photos',type+'-'+id);
+            const blob=providedBlob||await photoDB.getItem('photos',type+'-'+id);
             if(!blob||photoViewRequests.get(element)!==request)return;
             if(await InventoryPhotoWatermark.render(element,blob,photoKey(type,id),photoDescription(type,id))&&photoViewRequests.get(element)===request)onReady();
         }catch(error){if(photoViewRequests.get(element)===request)showToast('No se pudo mostrar la fotografía: '+escapeHTML(error.message),'error');}
@@ -435,7 +435,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     function changeTab(tab) {
-        localStorage.setItem('inventario-last-tab',tab);
+        localStorage.setItem(InventorySessions.key('inventario-last-tab'),tab);
         document.body.classList.toggle('editing-additional',tab==='adicionales');
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active')); document.getElementById(`${tab}-tab`).classList.add('active'); document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
         const globalSearch = document.getElementById('global-search-input'); globalSearch.value = ''; const invActions = document.getElementById('nav-inventory-actions');
@@ -791,7 +791,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     };
 
-    window.showAdicDetail = id => {
+    window.showAdicDetail = (id,photoBlob) => {
         const i = state.additionalItems.find(x=>x.id===id); if(!i) return; document.getElementById('ad-det-desc').textContent = i.descripcion || '-'; document.getElementById('ad-det-clave').textContent = i.claveAsignada || 'Sin Clave'; document.getElementById('ad-det-marca').textContent = i.marca || '-'; document.getElementById('ad-det-modelo').textContent = i.modelo || '-'; document.getElementById('ad-det-serie').textContent = i.serie || '-';
 
         let dynHtml = '';
@@ -811,7 +811,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('ad-det-edit-btn').onclick = () => { document.getElementById('adicional-detail-view-modal').classList.remove('show'); editAdic(id); }; document.getElementById('ad-det-foto-btn').dataset.id = id; document.getElementById('ad-det-foto-btn').onclick = () => showPhoto('additional', id);
         document.getElementById('ad-det-photo').classList.add('hidden'); document.getElementById('ad-delete-photo-btn').classList.add('hidden'); document.getElementById('ad-det-no-photo').classList.remove('hidden');
         clearPhotoView(document.getElementById('ad-det-photo'));
-        if(state.additionalPhotos[id])loadPhotoView('ad-det-photo','additional',id,()=>{document.getElementById('ad-det-photo').classList.remove('hidden');document.getElementById('ad-delete-photo-btn').classList.remove('hidden');document.getElementById('ad-det-no-photo').classList.add('hidden');});
+        if(state.additionalPhotos[id])loadPhotoView('ad-det-photo','additional',id,()=>{document.getElementById('ad-det-photo').classList.remove('hidden');document.getElementById('ad-delete-photo-btn').classList.remove('hidden');document.getElementById('ad-det-no-photo').classList.add('hidden');},photoBlob);
         locatedWarning('additional-located-warning',i.usuario||'');document.getElementById('adicional-detail-view-modal').classList.add('show');
     };
 
@@ -846,7 +846,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     };
 
-    window.showInvDetail = c => {
+    window.showInvDetail = (c,photoBlob) => {
         const i = state.inventory.find(x=>x['CLAVE UNICA']===c); if(!i) return; document.getElementById('detail-view-clave').textContent = i['CLAVE UNICA']; document.getElementById('detail-view-descripcion').textContent = i.DESCRripcion || i.DESCRIPCION; document.getElementById('detail-view-marca').textContent = i.MARCA||'-'; document.getElementById('detail-view-modelo').textContent = i.MODELO||'-'; document.getElementById('detail-view-serie').textContent = i.SERIE||'-'; document.getElementById('detail-view-usuario').textContent = i['NOMBRE DE USUARIO']||'Sin asignar'; document.getElementById('detail-view-ubicacion-especifica').textContent = i.ubicacionEspecifica||'-';
         const nombreAreaOriginal = cleanAreaName(i.areaOriginal, NOMBRES_AREAS[i.areaOriginal] || ''); document.getElementById('detail-view-area').textContent = i.areaOriginal + (nombreAreaOriginal ? ` - ${nombreAreaOriginal}` : '');
         const invUser = state.resguardantes.find(u => u.name === i['NOMBRE DE USUARIO']);
@@ -858,7 +858,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (i.UBICADO === 'SI' && i.ubicadoPor) { document.getElementById('detail-view-auditor').innerHTML = `${escapeHTML(InventoryTeam.label(i.ubicadoPor,i.ubicadoPorNumero))}<br><span class="text-sm">Auxiliado por: ${escapeHTML(InventoryTeam.label(i.auxiliadoPor,i.auxiliadoPorNumero))}</span>`; document.getElementById('detail-view-auditor-container').classList.remove('hidden'); } else document.getElementById('detail-view-auditor-container').classList.add('hidden');
         document.getElementById('detail-view-photo').classList.add('hidden'); document.getElementById('delete-active-photo-btn').classList.add('hidden'); document.getElementById('detail-view-no-photo').classList.remove('hidden');
         clearPhotoView(document.getElementById('detail-view-photo'));
-        if(state.photos[c])loadPhotoView('detail-view-photo','inventory',c,()=>{document.getElementById('detail-view-photo').classList.remove('hidden');document.getElementById('delete-active-photo-btn').classList.remove('hidden');document.getElementById('detail-view-no-photo').classList.add('hidden');});
+        if(state.photos[c])loadPhotoView('detail-view-photo','inventory',c,()=>{document.getElementById('detail-view-photo').classList.remove('hidden');document.getElementById('delete-active-photo-btn').classList.remove('hidden');document.getElementById('detail-view-no-photo').classList.add('hidden');},photoBlob);
 
         document.getElementById('detail-btn-ubicar').onclick=()=>assignSelected([c]);
         document.getElementById('detail-btn-reetiquetar').onclick=()=>assignSelected([c],true);
@@ -909,7 +909,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     for(const id of ['note-textarea','note-description2','note-marca','note-modelo','note-serie']){const input=document.getElementById(id);input.addEventListener('focus',()=>{noteSuggestionField=id;noteSuggestionQuery=input.value;renderNoteSuggestions();});input.addEventListener('input',()=>{noteSuggestionField=id;updateNoteDescription();noteSuggestionQuery=input.value;renderNoteSuggestions();});}
 
-    function openNoteEditor(){const modal=document.getElementById('notes-modal'),input=document.getElementById('note-textarea');modal.classList.add('show');modal.querySelector('.note-editor-body').scrollTop=0;input.focus({preventScroll:true});input.setSelectionRange(input.value.length,input.value.length);}
+    function openNoteEditor(){const modal=document.getElementById('notes-modal'),input=document.getElementById('note-textarea');modal.classList.add('show');modal.querySelector('.note-editor-body').scrollTop=0;input.focus({preventScroll:true});input.setSelectionRange(input.value.length,input.value.length);noteSuggestionQuery='';renderNoteSuggestions();}
     document.getElementById('notes-modal').addEventListener('keydown',event=>{
         if(event.isComposing||!event.currentTarget.classList.contains('show'))return;
         if(event.key==='Escape'){event.preventDefault();event.stopPropagation();document.getElementById('note-cancel-btn').click();}
@@ -963,7 +963,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('retag-bulk-archive').onclick=()=>{const keys=[...retagSelected],reopen=retagArchived;if(!keys.length||retagSaving)return;showConfirm(reopen?'Volver a pendientes':'Confirmar etiquetas colocadas',reopen?'Los bienes seleccionados volverán a pendientes.':`Se archivarán ${keys.length} bienes como etiquetados. Confirma que ya colocaste sus etiquetas.`,async()=>{if(retagSaving)return;retagSaving=true;renderRetagList();try{let next=state;for(const key of keys)next=reopen?InventoryRetag.reopen(next,key):InventoryRetag.complete(next,key,state.currentUser?.name);await photoDB.setItem('appData','mainState',InventoryData.clean(next));saveSnapshot('Archivar reetiquetado masivo');state=next;retagSelected.clear();filterAndRenderInventory();showToast('Actualizados '+keys.length+' bienes.','success');}catch(e){showToast('No se pudo guardar: '+e.message,'error');}finally{retagSaving=false;renderRetagList();}});};
     document.getElementById('retag-more').onclick=()=>{retagLimit+=30;renderRetagList();};
 
-    try{window.viewArchivedNotes=localStorage.getItem('inventario-notes-view')==='archived';}catch{window.viewArchivedNotes=false;}
+    try{window.viewArchivedNotes=localStorage.getItem(InventorySessions.key('inventario-notes-view'))==='archived';}catch{window.viewArchivedNotes=false;}
     window.currentNotesPage = 1;
     const notesPerPage = 6;
     const selectedNotes=new Set();
@@ -972,7 +972,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('filter-notas-archived').onclick = () => { window.viewArchivedNotes=true;selectedNotes.clear(); window.currentNotesPage=1; updateNotasTabUI(); renderNotasTab(); };
 
     function updateNotasTabUI() {
-        try{localStorage.setItem('inventario-notes-view',window.viewArchivedNotes?'archived':'active');}catch{}
+        try{localStorage.setItem(InventorySessions.key('inventario-notes-view'),window.viewArchivedNotes?'archived':'active');}catch{}
         document.getElementById('filter-notas-active').setAttribute('aria-pressed', String(!window.viewArchivedNotes));
         document.getElementById('filter-notas-archived').setAttribute('aria-pressed', String(!!window.viewArchivedNotes));
     }
@@ -1063,20 +1063,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(!field)throw Error('No se reconoce el destino de la fotografía.');
             const flags={...state[field]};for(const key of ids)flags[key]=true;
             const next={...state,[field]:flags};
+            InventoryPhotoWatermark.stamp(blob,photoKey(type,ids[0]),photoDescription(type,ids[0])).catch(()=>{});
             await photoDB.setItem('appData','mainState',InventoryData.clean(next),ids.map(key=>({store:'photos',key:type+'-'+key,value:blob})));
             state=next;stopCamera();document.getElementById('photo-modal').classList.remove('show');
-            if(type==='inventory'&&t!=='inventory-bulk'&&document.getElementById('item-detail-view-modal').classList.contains('show'))showInvDetail(id);
-            if(type==='additional'&&document.getElementById('adicional-detail-view-modal').classList.contains('show'))showAdicDetail(id);
-            if(type==='location'&&document.getElementById('user-detail-view-modal').classList.contains('show'))showUserDetail(id.split('|')[0]);
+            if(type==='inventory'&&t!=='inventory-bulk'&&document.getElementById('item-detail-view-modal').classList.contains('show'))showInvDetail(id,blob);
+            if(type==='additional'&&document.getElementById('adicional-detail-view-modal').classList.contains('show'))showAdicDetail(id,blob);
+            if(type==='location'&&document.getElementById('user-detail-view-modal').classList.contains('show'))showUserDetail(id.split('|')[0]);if(type==='user'&&document.getElementById('user-detail-view-modal').classList.contains('show'))showUserDetail(id);
 
             if(type==='inventory')filterAndRenderInventory();else if(type==='additional')renderAdicionales();else renderUsers();showToast('Foto guardada','success');
     }
     let photoSaving=false;
     const photoSaveStatus=document.createElement('p');photoSaveStatus.id='photo-save-status';photoSaveStatus.setAttribute('role','status');photoSaveStatus.hidden=true;photoFooter.prepend(photoSaveStatus);
+    const pendingPhotoPreview=document.createElement('img');pendingPhotoPreview.id='photo-pending-preview';pendingPhotoPreview.alt='Foto capturada, guardando en este dispositivo';pendingPhotoPreview.hidden=true;pendingPhotoPreview.style.cssText='max-height:45dvh;max-width:100%;object-fit:contain;margin:8px auto';photoFooter.before(pendingPhotoPreview);
     async function processPhoto(producer){
         if(photoSaving)return;photoSaving=true;
-        const controls=['capture-photo-btn','upload-photo-btn','photo-close-btn'].map(id=>document.getElementById(id)),capture=document.getElementById('capture-photo-btn'),label=capture.innerHTML,hadCamera=!!cameraStream;controls.forEach(b=>b.disabled=true);capture.textContent='Guardando foto…';photoSaveStatus.hidden=false;photoSaveStatus.textContent='Preparando imagen…';
-        try{await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));const blob=await producer();stopCamera();photoSaveStatus.textContent='Guardando foto en este dispositivo…';await savePhotoBlob(blob);}catch(error){showToast('No se pudo guardar la foto: '+error.message,'error');photoSaveStatus.textContent='No se guardó. Puedes volver a intentarlo.';if(hadCamera&&!cameraStream&&document.getElementById('photo-modal').classList.contains('show'))startCamera();}finally{photoSaving=false;controls.forEach(b=>b.disabled=false);capture.innerHTML=label;document.getElementById('photo-input').value='';if(!document.getElementById('photo-modal').classList.contains('show'))photoSaveStatus.hidden=true;}
+        const controls=['capture-photo-btn','upload-photo-btn','photo-close-btn'].map(id=>document.getElementById(id)),capture=document.getElementById('capture-photo-btn'),label=capture.innerHTML,hadCamera=!!cameraStream;controls.forEach(b=>b.disabled=true);capture.textContent='Guardando foto…';let previewUrl;photoSaveStatus.hidden=false;photoSaveStatus.textContent='Preparando imagen…';
+        try{await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));const blob=await producer();stopCamera();previewUrl=URL.createObjectURL(blob);pendingPhotoPreview.src=previewUrl;pendingPhotoPreview.hidden=false;document.getElementById('camera-view-container').classList.add('hidden');await new Promise(resolve=>requestAnimationFrame(resolve));photoSaveStatus.textContent='Guardando foto en este dispositivo…';await savePhotoBlob(blob);}catch(error){showToast('No se pudo guardar la foto: '+error.message,'error');photoSaveStatus.textContent='No se guardó. Puedes volver a intentarlo.';if(hadCamera&&!cameraStream&&document.getElementById('photo-modal').classList.contains('show')){document.getElementById('camera-view-container').classList.remove('hidden');startCamera();}}finally{pendingPhotoPreview.hidden=true;pendingPhotoPreview.removeAttribute('src');if(previewUrl)URL.revokeObjectURL(previewUrl);photoSaving=false;controls.forEach(b=>b.disabled=false);capture.innerHTML=label;document.getElementById('photo-input').value='';if(!document.getElementById('photo-modal').classList.contains('show'))photoSaveStatus.hidden=true;}
     }
     document.getElementById('capture-photo-btn').onclick=()=>processPhoto(async()=>{const video=document.getElementById('camera-stream');if(!video.videoWidth)throw Error('Espera a que la cámara muestre la imagen.');const canvas=document.getElementById('photo-canvas'),scale=Math.min(1,1600/Math.max(video.videoWidth,video.videoHeight));canvas.width=Math.max(1,Math.round(video.videoWidth*scale));canvas.height=Math.max(1,Math.round(video.videoHeight*scale));canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);stopCamera();return await new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?.size?resolve(blob):reject(Error('No se pudo capturar.')),'image/jpeg',0.8));});
     function resumePhotoCamera(){if(!photoSaving&&cameraStream&&document.getElementById('photo-modal').classList.contains('show'))document.getElementById('camera-stream').play().catch(()=>{});}
@@ -1084,8 +1086,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('upload-photo-btn').onclick=()=>{document.getElementById('photo-input').click();};
     document.getElementById('photo-input').onchange=event=>{const file=event.target.files?.[0];if(!file)return;processPhoto(async()=>{if(file.size>30*1024*1024)throw Error('La imagen excede 30 MB.');const image=new Image(),url=URL.createObjectURL(file);try{image.src=url;await image.decode();const scale=Math.min(1,1600/Math.max(image.naturalWidth,image.naturalHeight)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);return await new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?.size?resolve(blob):reject(Error('No se pudo abrir la imagen.')),'image/jpeg',0.9));}finally{URL.revokeObjectURL(url);}});};
 
-    document.getElementById('delete-photo-btn').onclick = () => { const t = document.getElementById('photo-input').dataset.t; const id = document.getElementById('photo-input').dataset.i; photoDB.db.transaction(['photos'], 'readwrite').objectStore('photos').delete(`${escapeHTML(t)}-${id}`); if(t==='inventory') delete state.photos[id]; else if (t==='user') delete state.userPhotos[id]; else if (t==='location') delete state.locationPhotos[id]; else delete state.additionalPhotos[id]; saveState(); showToast('Foto eliminada'); document.getElementById('photo-modal').classList.remove('show'); if (t === 'location' && document.getElementById('user-detail-view-modal').classList.contains('show')) { const [uid] = id.split('|'); showUserDetail(uid); } filterAndRenderInventory(); renderAdicionales(); renderUsers(); };
-    function deletePhotoFromModal(type, id) { showConfirm('Eliminar Foto', '¿Eliminar y tomar nueva?', () => { photoDB.db.transaction(['photos'], 'readwrite').objectStore('photos').delete(`${type}-${id}`); if(type === 'inventory') { delete state.photos[id]; document.getElementById('detail-view-photo').classList.add('hidden'); document.getElementById('delete-active-photo-btn').classList.add('hidden'); document.getElementById('detail-view-no-photo').classList.remove('hidden'); } else if (type === 'additional') { delete state.additionalPhotos[id]; document.getElementById('ad-det-photo').classList.add('hidden'); document.getElementById('ad-delete-photo-btn').classList.add('hidden'); document.getElementById('ad-det-no-photo').classList.remove('hidden'); } saveState(); filterAndRenderInventory(); renderAdicionales(); setTimeout(() => showPhoto(type, id), 200); }); }
+    async function removePhoto(type,id){
+        if(photoSaving)throw Error('Espera a que termine la fotografía.');const field={inventory:'photos',additional:'additionalPhotos',user:'userPhotos',location:'locationPhotos'}[type];if(!field)throw Error('Destino de fotografía inválido.');
+        const overlay=document.getElementById('loading-overlay');overlay.classList.add('show');document.getElementById('loading-text').textContent='Eliminando fotografía…';
+        try{const flags={...state[field]};delete flags[id];const next={...state,[field]:flags};await photoDB.setItem('appData','mainState',InventoryData.clean(next),[{store:'photos',key:type+'-'+id,delete:true}]);state=next;filterAndRenderInventory();renderAdicionales();renderUsers();}
+        finally{overlay.classList.remove('show');}
+    }
+    document.getElementById('delete-photo-btn').onclick=async()=>{const input=document.getElementById('photo-input'),type=input.dataset.t,id=input.dataset.i;try{await removePhoto(type,id);clearPhotoView(document.getElementById('item-photo-img'));document.getElementById('photo-modal').classList.remove('show');if(type==='inventory'&&document.getElementById('item-detail-view-modal').classList.contains('show'))showInvDetail(id);if(type==='additional'&&document.getElementById('adicional-detail-view-modal').classList.contains('show'))showAdicDetail(id);if(type==='location'&&document.getElementById('user-detail-view-modal').classList.contains('show'))showUserDetail(id.split('|')[0]);if(type==='user'&&document.getElementById('user-detail-view-modal').classList.contains('show'))showUserDetail(id);showToast('Foto eliminada');}catch(error){showToast('No se pudo eliminar: '+error.message,'error');}};
+    function deletePhotoFromModal(type,id){showConfirm('Eliminar Foto','¿Eliminar y tomar nueva?',async()=>{try{await removePhoto(type,id);if(type==='inventory')showInvDetail(id);else showAdicDetail(id);showPhoto(type,id);}catch(error){showToast('No se pudo eliminar: '+error.message,'error');}});}
     document.getElementById('delete-active-photo-btn').onclick = () => { deletePhotoFromModal('inventory', document.getElementById('detail-view-clave').textContent); }; document.getElementById('ad-delete-photo-btn').onclick = () => { deletePhotoFromModal('additional', document.getElementById('ad-det-foto-btn').dataset.id); };
 
     let scanSession = 0, scannerStarting = false;
@@ -1530,7 +1538,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             // Capture the in-memory state even when a previous persistence attempt failed.
             const session=JSON.stringify(InventoryData.clean(state));
-            const zip=new JSZip();zip.file('session.json',session);
+            const zip=new JSZip();zip.file('session.json',session);zip.file('workspace.json',JSON.stringify({version:1,name:InventorySessions.current().name}));
             const rfidBackup=await InventoryRFIDStore.exportPack(photoDB);zip.file('rfid-catalog.json',JSON.stringify(rfidBackup));
             const auditors=await InventoryTeam.exportDirectory();zip.file('auditors.json',JSON.stringify(auditors));
             let images=0;
@@ -1539,7 +1547,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             zip.file('backup-manifest.json',JSON.stringify({version:3,createdAt:timestamp,inventory:snapshot.inventory.length,additional:(snapshot.additionalItems||[]).length,images,rfidTags:rfidBackup.records.length,auditors:auditors.length}));
             const content=await zip.generateAsync({type:'blob'});
             await InventoryBackups.inspect(content);
-            await InventoryOutput.save(content,InventoryBackupDetails.filename(state));
+            await InventoryOutput.save(content,InventorySessions.backupName(InventoryBackupDetails.filename(state)));
             await photoDB.setItem('appData','lastBackupGenerated',timestamp);await renderBackupStatus();
             showToast(InventoryOutput.native ? 'Respaldo guardado en la ubicación elegida.' : 'Respaldo comprobado. Revisa que el ZIP esté en Descargas.','success');
         } catch(error) {showToast('No se pudo completar el respaldo: '+error.message,'error');}
@@ -1637,7 +1645,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
     document.getElementById('restore-cancel').onclick=()=>document.getElementById('restore-backup-dialog').close();
     document.getElementById('restore-backup-dialog').addEventListener('cancel',event=>{if(document.getElementById('restore-confirm').disabled)event.preventDefault();});
-    document.getElementById('clear-session-btn').onclick = () => { showConfirm('¡PELIGRO! Borrar Todo', 'Esto eliminará todo el inventario, FOTOS y el catálogo RFID de este navegador.', () => { document.getElementById('loading-overlay').classList.add('show'); try { if(photoDB.db) { photoDB.db.close(); } const req = indexedDB.deleteDatabase(photoDB.name); req.onsuccess = () => window.location.reload(); req.onerror = () => { window.location.reload(); }; req.onblocked = () => { window.location.reload(); }; } catch(e) { window.location.reload(); } }); };
+    document.getElementById('clear-session-btn').onclick = () => { showConfirm('¡PELIGRO! Borrar sesión actual', 'Esto eliminará los datos y fotos de la sesión actual. Las otras sesiones se conservan.', () => { document.getElementById('loading-overlay').classList.add('show'); try { if(photoDB.db) { photoDB.db.close(); } const req = indexedDB.deleteDatabase(photoDB.name); req.onsuccess = () => window.location.reload(); req.onerror = () => { window.location.reload(); }; req.onblocked = () => { window.location.reload(); }; } catch(e) { window.location.reload(); } }); };
     document.querySelectorAll('.modal-overlay .fa-xmark, button[id$="-cancel-btn"], button[id$="-close-btn"]').forEach(b => { if(b.id==='qr-close-btn') return; b.onclick = e => { e.target.closest('.modal-overlay').classList.remove('show'); stopCamera(); if (html5QrCode && html5QrCode.isScanning) { html5QrCode.stop().catch(err => {}); } focusSearch(); }; });
 
     document.getElementById('note-cancel-btn').onclick=()=>{
@@ -1647,13 +1655,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         else focusSearch();
     };
 
+    let workspaceOpening=false;
     async function openWorkspace(team) {
+        workspaceOpening=true;try{
         if(state.loggedIn){
             state.currentUser=team.active;state.companion=team.companion;swapped=false;
             document.getElementById('team-page').classList.add('hidden');
             document.getElementById('main-app').classList.remove('hidden');renderTeam();return;
         }
-        await photoDB.init('parejas-local-v1');stateHistory=await photoDB.getItem('appData','changeHistory')||[];
+        await photoDB.init(InventorySessions.account());stateHistory=await photoDB.getItem('appData','changeHistory')||[];
         drafts=await photoDB.getItem('appData','captureDrafts')||{additional:{},notes:{}};
         const stored = await photoDB.getItem('appData', 'mainState');
         if (stored) state = {...state, ...window.InventoryData.clean(stored)};
@@ -1673,13 +1683,38 @@ document.addEventListener('DOMContentLoaded', async () => {
             await photoDB.setItem('appData','mainState',InventoryData.clean(state));
         }
         if(InventoryNotes.normalizeState(state))await photoDB.setItem('appData','mainState',InventoryData.clean(state));
-        showMain();restoreAdditionalDraft();renderSessionHistory();
+        const ui=await photoDB.getItem('appData','workspaceUI');showMain();restoreAdditionalDraft();renderSessionHistory();try{InventorySessions.update(InventorySessions.current().id,{summary:workspaceSummary()});}catch{showToast('No se pudo actualizar el resumen de sesiones. Genera un respaldo.','warning');}restoreWorkspaceUI(ui);
+        }finally{workspaceOpening=false;}
     }
-    window.InventoryTeam.mount(openWorkspace);
+    function restoreWorkspaceUI(ui){
+        if(!ui)return;document.getElementById('user-name').value=ui.name||'';document.getElementById('user-area-select').value=ui.area||'';const panel=document.getElementById('register-user-panel');
+        for(const [id,value] of Object.entries(ui.userForm||{})){const input=document.getElementById(id);if(input&&panel.contains(input)&&input.matches('input,select'))input.value=String(value);}
+        for(const id of ['user-edificio-select','user-piso-select','user-location-select'])document.getElementById(id).dispatchEvent(new Event('change'));
+        lastSelectedEdificio=document.getElementById('user-edificio-select').value;lastSelectedPiso=document.getElementById('user-piso-select').value;
+        tempUserLocations=ui.locations||[];tempUserLocationDetails=ui.details||{};renderLocChips(document.getElementById('new-user-locations-list'),tempUserLocations,tempUserLocationDetails);const select=document.getElementById('active-user-location-select');if([...select.options].some(o=>o.value===ui.activeLocation))select.value=ui.activeLocation;
+        if(Array.isArray(ui.selection))ui.selection.forEach(key=>{if(state.inventory.some(i=>i['CLAVE UNICA']===key))inventorySelection.add(key);});if(Array.isArray(ui.searchHistory))searchHistory=ui.searchHistory;
+        document.querySelectorAll('.inv-cb').forEach(cb=>cb.checked=inventorySelection.has(cb.closest('tr').dataset.clave));
+        const search=document.getElementById('global-search-input');if(ui.query&&!search.disabled)search.value=ui.query;
+        filterAndRenderInventory();const tab=document.querySelector('.tab-btn.active')?.dataset.tab;if(tab==='users')renderUsers();if(tab==='adicionales')renderAdicionales();if(tab==='notas')renderNotasTab();if(tab==='reportes')renderReportSearch();
+    }
+
+    function workspaceSummary(){return {inventory:state.inventory.length,located:state.inventory.filter(i=>i.UBICADO==='SI').length,additional:state.additionalItems.length};}
+    async function checkpointWorkspace(){
+        if(workspaceOpening||photoSaving||scannerStarting||window.InventoryRFIDBusy||!document.getElementById('rfid-preview').hidden||document.getElementById('loading-overlay').classList.contains('show')||document.querySelector('.modal-overlay.show')||[...document.querySelectorAll('dialog[open]')].some(d=>d.id!=='workspace-dialog'))throw Error('Guarda o cancela la operación abierta antes de cambiar de sesión.');
+        if(state.loggedIn){captureInventorySelection();await captureAdditionalDraft();InventoryTeam.remember({active:state.currentUser,companion:state.companion});
+            await photoDB.setItem('appData','captureDrafts',structuredClone(drafts));await photoDB.setItem('appData','changeHistory',structuredClone(stateHistory));
+            const userForm=Object.fromEntries([...document.getElementById('register-user-panel').querySelectorAll('input[id],select[id]')].map(e=>[e.id,e.value]));
+            const ui={userForm,name:document.getElementById('user-name').value,area:document.getElementById('user-area-select').value,locations:tempUserLocations,details:tempUserLocationDetails,activeLocation:document.getElementById('active-user-location-select').value,selection:[...inventorySelection],searchHistory,query:document.getElementById('global-search-input').value};
+            await photoDB.setItem('appData','mainState',InventoryData.clean(state),[{store:'appData',key:'captureDrafts',value:structuredClone(drafts)},{store:'appData',key:'workspaceUI',value:structuredClone(ui)}]);InventorySessions.update(InventorySessions.current().id,{summary:workspaceSummary()});
+        }
+        await photoDB.flush();stopCamera();
+    }
+    await window.InventoryTeam.mount(openWorkspace);
+    InventorySessions.mount({beforeLeave:checkpointWorkspace,summary:()=>state.loggedIn?workspaceSummary():null,team:()=>state.loggedIn?{active:state.currentUser,companion:state.companion}:null,backup:()=>document.getElementById('export-session-btn').click()});
 
     function showMain() {
         document.getElementById('team-page').classList.add('hidden'); document.getElementById('main-app').classList.remove('hidden'); renderTeam();
         const today=new Date();document.getElementById('rep-date').value=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');document.getElementById('rep-year').value=today.getFullYear();
-        renderBackupStatus();updateHeaderArea(); populateFilters(); renderDashboard(); const lastTab=localStorage.getItem('inventario-last-tab');changeTab(['users','inventory','adicionales','notas','reportes','settings'].includes(lastTab)?lastTab:'users'); updateDatalists(); populateReportFilters(); toggleAdicFormFields('ad');
+        renderBackupStatus();updateHeaderArea(); populateFilters(); renderDashboard(); const lastTab=localStorage.getItem(InventorySessions.key('inventario-last-tab'));changeTab(['users','inventory','adicionales','notas','reportes','settings'].includes(lastTab)?lastTab:'users'); updateDatalists(); populateReportFilters(); toggleAdicFormFields('ad');
     }
 });

@@ -1,6 +1,6 @@
 (function(root) {
   'use strict';
-  const SESSION = 'inventario-parejas-session';
+  const sessionKey=()=>root.InventorySessions?.teamKey(root.InventorySessions.current().id)||'inventario-parejas-session';
   const DIRECTORY = 'inventario-parejas-directory';
   const person = value => {
     const employeeNumber = String(value?.employeeNumber || '').trim();
@@ -31,8 +31,8 @@
   const savedAttribution = item => Object.fromEntries(Object.keys(clear()).map(key => [key, item[key] || '']));
   const label = name => name || 'Sin registro';
   const excel = item => ({'Ubicado Por':item.ubicadoPor || '', 'Auxiliado Por':item.auxiliadoPor || ''});
-  function remember(team) { localStorage.setItem(SESSION, JSON.stringify(pair(team.active, team.companion))); }
-  function forget() { sessionStorage.removeItem(SESSION); localStorage.removeItem(SESSION); }
+  function remember(team) { localStorage.setItem(sessionKey(), JSON.stringify(pair(team.active, team.companion))); }
+  function forget() { sessionStorage.removeItem(sessionKey()); localStorage.removeItem(sessionKey()); }
   function validateDirectory(entries) {
     if (!Array.isArray(entries)) throw Error('El catálogo de auditores no es válido.');
     const seen = new Set();
@@ -128,7 +128,7 @@
     };
     render();
     try {
-      const saved = JSON.parse(localStorage.getItem(SESSION) || sessionStorage.getItem(SESSION) || 'null');
+      const saved = JSON.parse(localStorage.getItem(sessionKey()) || sessionStorage.getItem(sessionKey()) || 'null');
       if (saved) { const team=pair(saved.active,saved.companion); await open(team); remember(team); }
     } catch(error) { forget(); status.textContent = 'Selecciona la pareja para continuar. ' + error.message; }
   }
