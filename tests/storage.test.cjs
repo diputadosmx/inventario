@@ -23,3 +23,5 @@ test('no reintenta una escritura abortada ni oculta otros errores',async()=>{
  s.api.db.transaction=()=>{throw new DOMException('Missing store','NotFoundError');};
  await assert.rejects(s.api.transaction('missing','readonly',()=>{}),{name:'NotFoundError'});assert.equal(s.opens,1);
 });
+
+test('borra foto y actualiza indicadores en la misma transacción',async()=>{const s=setup();await s.api.init('test');const calls=[];s.api.db.transaction=(stores,mode)=>{const tx={objectStore:store=>({put:(value,key)=>calls.push([store,'put',key]),delete:key=>calls.push([store,'delete',key])})};queueMicrotask(()=>tx.oncomplete());return tx;};await s.api.setItem('appData','mainState',{},[{store:'photos',key:'inventory-1',delete:true}]);assert.deepEqual(calls,[['appData','put','mainState'],['photos','delete','inventory-1']]);});

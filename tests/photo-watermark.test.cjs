@@ -117,3 +117,5 @@ test('marca descripción corta junto a clave sin modificar original y limita tex
   await long.api.stamp(original, '002', 'A'.repeat(200));
   assert.equal(long.calls.text.slice(1).map(line => line[0]).join(''), 'A'.repeat(79) + '…');
 });
+
+test('captura y detalle comparten el procesamiento de marca sin duplicar codificación',async()=>{const {api,calls}=fixture();const blob=new Blob(['foto']);const [a,b]=await Promise.all([api.stamp(blob,'A','MESA'),api.stamp(blob,'A','MESA')]);assert.equal(a,b);assert.equal(calls.encoded.length,1);await api.stamp(blob,'A','SILLA');assert.equal(calls.encoded.length,2);});
